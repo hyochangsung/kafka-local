@@ -29,3 +29,8 @@ root@4527e52ba5f6:/# cd /opt/kafka/bin
 > kafka-topics.sh --create --topic spacex --bootstrap-server 127.0.0.1:9092 --partitions 1 --replication-factor 1
 
 ```
+# 토픽 전송(프로듀서)
+kafka-console-producer.sh --topic spacex --bootstrap-server 127.0.0.1:9092
+
+# 컨슈머
+kafka-console-consumer.sh --topic spacex --bootstrap-server 127.0.0.1:9092
