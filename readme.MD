@@ -64,6 +64,10 @@ MESSAGING    :     Kafka / MSK (Broker) <-------------------------------------+-
                |          +----( Topic A: factory-json-topic ) <--- [Channel A Result]
                |          +----( Topic B: factory-text-topic ) <--- [Channel B Result]
                v                                                               |
+               v                                                               |
+                                                                        kafka connect / ui
+                                                                                |
+                                                                                v               
 VISUALIZE    :     OpenSearch (DB)      <---( Indexing & Search )---->  DASHBOARD (Kibana)
 ====================================================================================================
 ```
@@ -94,6 +98,9 @@ VISUALIZE    :     OpenSearch (DB)      <---( Indexing & Search )---->  DASHBOAR
                |          +----( 토픽 A: factory-json-topic ) <--- [채널 A 결과물]
                |          +----( 토픽 B: factory-text-topic ) <--- [채널 B 결과물]
                v                                                                  |
+                                                                            kafka connect / ui
+                                                                                  |
+                                                                                  v
 시각화/분석  :     OpenSearch (DB)      <---( 인덱싱 및 검색 )------>  대시보드 (Kibana)
 ====================================================================================================
 ```
@@ -105,3 +112,86 @@ VISUALIZE    :     OpenSearch (DB)      <---( Indexing & Search )---->  DASHBOAR
     docker compose down
     docker compose up -d
 ```
+
+# Fluentd(40~60MB) <-> Fluent-Bit (1~5MB)
+- 태그 기반 라우팅 도구(Tag Based Routing)
+- Ruby(C 결합) 구조 <-> C 
+- fluent-bit/etc/fluent-bit.conf 에서 구성 기술 완료
+- 목표
+    - 데이터 수집, 처리, 전달 => ETL 도구
+    - 경량형 오픈 소스 로그 프로세서
+    - 고가용성, 고성능 처리, 데이터 처리 안정성
+- 파이프라인 
+    - Input : 파일, 시스템 매트릭, http 스트림, .. 다양한 소스 제공
+    - Service, Parser, Filter, Buffer, Rounting
+    - Output : Kafka/Opensearch/Elasticsearch/s3/... 모두 가능함
+- 지원 플러그인 
+    - 1000여개 <-> 100여개
+
+- conf 구성 => 규칙 기술
+    ```
+    docker compose restart
+    ```
+
+- 커슈머 구동
+    ```
+        PS ...> docker exec -it kafka-local bash
+
+        # json 관련 토픽 커슈머
+        > ./opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server 127.0.0.1:9092 --topic factory-json-topic --from-beginning
+
+        # text 관련 토픽 커슈머
+        > ./opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server 127.0.0.1:9092 --topic factory-text-topic --from-beginning
+    ```
+
+- 로그 발생 -> 카프카 컨슈머 수시 확인
+    ```
+        python log_gen.py
+    ```
+    
+- conf가 수정되면
+    - `docker compose restart` 반드시 수행
+
+- 전달 내용
+    - http로 전달해서 데이터가 늘어났음, 
+    - forward등 전달 방식은 다양함
+        - forward 시도, 24224 포트 사용
+```
+{
+    "event":{
+        "original":"[{\"date\":1777005819.42045,\"log\":\"\\\"[2026-04-24 13:43:38] ID=AI-FACTORY-001 |   TEMP:87.5 |   HUMI:42.1 |   STAT:RUNNING\\\"\"}]"},
+        "host":{"ip":"172.19.0.3"},
+        "user_agent":{"original":"Fluent-Bit"},
+        "date":1.77700581942045E9,
+        "url":{
+            "path":"/",
+            "domain":"logstash",
+            "port":5044
+        },
+        "http":{
+            "version":"HTTP/1.1",
+            "method":"POST",
+            "request":{
+                "body":{
+                    "bytes":"124"
+                },
+                "mime_type":"application/json"
+            }
+        },
+        "log":"\"[2026-04-24 13:43:38] ID=AI-FACTORY-001 |   TEMP:87.5 |   HUMI:42.1 |   STAT:RUNNING\"","@version":"1",
+        "@timestamp":"2026-04-24T04:43:40.412003029Z"
+    }
+}
+```
+
+# 로그 형태
+- 참고
+    - 최초 데이터 => fluent-bit/logstash => 데이터 형태가 노이즈 많음!!(프토토콜때문에 추가된 내용이 많음) => 필터 역활 필요함
+    - 필터 보정 하는 내용 업데이트 (추후)
+
+# kafka 대시보드
+- kafka ui
+- 메세지의 흐름, connect를 통해 전달이 잘되는지 등등 모니터링 
+
+# 로컬 -> 클라우드 연결
+- kafka connect
